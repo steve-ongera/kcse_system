@@ -1,585 +1,515 @@
-#  KCSE Results Management System
+# KCSE Management System
 
-A full-stack web application for managing Kenya Certificate of Secondary Education (KCSE) examinations — from candidate registration through results publication. Built with **Django REST Framework** (backend) and **React JSX** (frontend).
+A full-stack web application for managing Kenya Certificate of Secondary Education (KCSE) examinations, built for the Kenya National Examinations Council (KNEC). The system handles candidate registration, marks entry, result management, and public result lookup.
 
 ---
 
-##  Table of Contents
+## Table of Contents
 
 - [Overview](#overview)
-- [System Architecture](#system-architecture)
+- [Technology Stack](#technology-stack)
 - [Project Structure](#project-structure)
-- [Tech Stack](#tech-stack)
-- [Core Features](#core-features)
-- [Installation & Setup](#installation--setup)
-  - [Backend (Django)](#backend-django)
-  - [Frontend (React)](#frontend-react)
+- [Getting Started](#getting-started)
 - [Environment Variables](#environment-variables)
 - [API Reference](#api-reference)
+- [Frontend Architecture](#frontend-architecture)
+- [Backend Architecture](#backend-architecture)
+- [Authentication](#authentication)
 - [Data Models](#data-models)
 - [Grading System](#grading-system)
-- [Security & Audit](#security--audit)
-- [Running Tests](#running-tests)
-- [Deployment](#deployment)
-- [Contributing](#contributing)
-- [License](#license)
+- [Security Considerations](#security-considerations)
+- [Development Notes](#development-notes)
 
 ---
 
 ## Overview
 
-The KCSE Management System digitizes and streamlines the entire KCSE examination lifecycle:
+The system serves two distinct user groups:
 
-1. **Candidate Registration** — Schools register Form 4 students via KNEC-linked portal
-2. **Examination Coordination** — Timetables, seating plans, attendance registers
-3. **Script Tracking** — Barcode/serial number tracking from exam room to marking centre
-4. **Marks Entry & Validation** — Secure examiner portals with automated score validation
-5. **Results Processing** — Grade computation, mean scores, rankings, moderation
-6. **Results Publication** — Candidates retrieve results using index number + full name (no login required)
-7. **Analytics & Reporting** — School performance, county rankings, national statistics
+**Public users** — candidates and guardians who need to look up official KCSE results using an index number and full name. No account is required.
 
-> **Public Access**: Any candidate can retrieve their results by entering their **11-digit KNEC index number** and **full name** — no account or login required.
+**Admin users** — KNEC staff, school administrators, and examiners who register candidates, enter marks, approve results, and monitor system activity through a protected dashboard.
 
 ---
 
-## System Architecture
+## Technology Stack
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        CLIENT LAYER                             │
-│   React JSX (Vite) │ Tailwind CSS │ Axios │ React Router v6     │
-└────────────────────────────┬────────────────────────────────────┘
-                             │ HTTP/HTTPS (REST API)
-┌────────────────────────────▼────────────────────────────────────┐
-│                      API GATEWAY LAYER                          │
-│         Django REST Framework │ JWT Auth │ CORS Headers         │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────────┐
-│                    APPLICATION LAYER                            │
-│  examinations/ app (core)  │  accounts/ app  │  analytics/ app  │
-│  - Candidate Registration  │  - Staff Auth   │  - Reports       │
-│  - Marks Entry             │  - Role-Based   │  - Statistics    │
-│  - Results Processing      │    Permissions  │  - Rankings      │
-│  - Script Tracking         │                 │                  │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────────┐
-│                      DATA LAYER                                 │
-│      PostgreSQL (primary) │ Redis (cache/sessions) │ S3 (media) │
-└─────────────────────────────────────────────────────────────────┘
-```
+### Backend
+
+| Component       | Technology                          |
+|----------------|--------------------------------------|
+| Framework       | Django 4.x + Django REST Framework  |
+| Authentication  | Django Simple JWT                   |
+| Database        | PostgreSQL (recommended)            |
+| Caching         | Django cache framework (1-hour TTL) |
+| Rate limiting   | DRF throttling (20 requests/hour for public lookup) |
+
+### Frontend
+
+| Component       | Technology                     |
+|----------------|----------------------------------|
+| Framework       | React 18                        |
+| Routing         | React Router 6                  |
+| HTTP client     | Axios                           |
+| Charts          | Recharts                        |
+| Build tool      | Vite 5                          |
+| Fonts           | Playfair Display, DM Sans, DM Mono |
 
 ---
 
 ## Project Structure
 
 ```
-kcse_system/
-├── backend/                          # Django project root
+kcse-management-system/
+│
+├── backend/                              # Django application
 │   ├── manage.py
 │   ├── requirements.txt
-│   ├── .env.example
-│   ├── kcse_system/                  # Django project config
-│   │   ├── __init__.py
-│   │   ├── settings/
-│   │   │   ├── base.py
-│   │   │   ├── development.py
-│   │   │   └── production.py
+│   ├── config/
+│   │   ├── settings.py
 │   │   ├── urls.py
-│   │   ├── wsgi.py
-│   │   └── asgi.py
-│   │
-│   └── core/
-│       ├── examinations/             #  CORE APPLICATION
-│       │   ├── __init__.py
-│       │   ├── admin.py
-│       │   ├── apps.py
-│       │   ├── models.py             # All data models
-│       │   ├── serializers.py        # DRF serializers
-│       │   ├── views.py              # API views
-│       │   ├── urls.py               # URL routing
-│       │   ├── permissions.py        # Custom permissions
-│       │   ├── validators.py         # Business logic validators
-│       │   ├── grading.py            # KCSE grading engine
-│       │   ├── tasks.py              # Celery async tasks
-│       │   ├── signals.py            # Django signals
-│       │   ├── filters.py            # DRF filter classes
-│       │   ├── pagination.py         # Custom pagination
-│       │   ├── tests/
-│       │   │   ├── test_models.py
-│       │   │   ├── test_views.py
-│       │   │   ├── test_serializers.py
-│       │   │   └── test_grading.py
-│       │   └── migrations/
-│       │
-│       ├── accounts/                 # User management
-│       │   ├── models.py             # Staff user, roles
-│       │   ├── serializers.py
-│       │   ├── views.py
-│       │   └── urls.py
-│       │
-│       └── analytics/                # Reports & statistics
-│           ├── models.py
-│           ├── serializers.py
-│           ├── views.py
-│           └── urls.py
+│   │   └── wsgi.py
+│   └── kcse/                            # Main Django app
+│       ├── models.py                    # All data models
+│       ├── serializers.py               # DRF serializers
+│       ├── views.py                     # API views
+│       ├── urls.py                      # URL routing
+│       └── admin.py                     # Django admin config
 │
-└── frontend/                         # React application
+└── frontend/                            # React application
     ├── package.json
-    ├── vite.config.js
+    ├── vite.config.js                   # Vite config with /api proxy
     ├── .env.example
-    ├── index.html
+    ├── index.html                       # Entry HTML, loads Google Fonts
     └── src/
-        ├── main.jsx
-        ├── App.jsx
+        ├── main.jsx                     # React root, imports global CSS
+        ├── App.jsx                      # Router tree, layout wrappers
+        │
+        ├── styles/
+        │   ├── general.css              # Design system, tokens, base styles
+        │   └── adminpages.css           # Admin layout, sidebar, data tables
+        │
         ├── utils/
-        │   ├── api.js
-        │   
+        │   └── api.js                   # Axios instance, all API calls
+        │
+        ├── context/
+        │   └── AuthContext.jsx          # JWT auth state, login/logout
+        │
+        ├── hooks/
+        │   ├── useAuth.js               # Re-exports from AuthContext
+        │   └── useResults.js            # Result lookup state management
+        │
         ├── components/
         │   ├── common/
-        │   │   ├── Navbar.jsx
-        │   │   ├── Footer.jsx
-        |   |   |__Sider.jsx( For superusers not nomal page)
-        │   │   ├── LoadingSpinner.jsx
-        │   │   └── ErrorBoundary.jsx
+        │   │   ├── Navbar.jsx           # Public navigation bar
+        │   │   ├── Footer.jsx           # Public footer
+        │   │   ├── Sider.jsx            # Admin sidebar (staff only)
+        │   │   ├── LoadingSpinner.jsx   # Reusable spinner
+        │   │   └── ErrorBoundary.jsx    # React error boundary
+        │   │
         │   ├── results/
-        │   │   ├── ResultsLookup.jsx   # Public index number lookup
-        │   │   ├── ResultCard.jsx      # Individual subject results
-        │   │   ├── GradeDisplay.jsx    # Grade + points display
-        │   │   └── ResultSlip.jsx      # Printable result slip
+        │   │   ├── ResultsLookup.jsx    # Public search form with validation
+        │   │   ├── ResultCard.jsx       # Single subject result row
+        │   │   ├── GradeDisplay.jsx     # Coloured grade pill + points badge
+        │   │   └── ResultSlip.jsx       # Full printable result slip
+        │   │
         │   └── admin/
-        │       ├── CandidateForm.jsx
-        │       ├── MarksEntry.jsx
-        │       └── Dashboard.jsx
-        ├── pages/
-        │   ├── Home.jsx
-        │   ├── ResultsPage.jsx         # Public results lookup page
-        │   ├── Admin pages (login.jsx etc )
-        │   └── NotFound.jsx
-        ├── hooks/
-        │   ├── useResults.js
-        │   └── useAuth.js
-        ├── context/
-        │   └── AuthContext.jsx
-        └── styles/
-            ├── general.css
-            └── adminpages.css
+        │       ├── CandidateForm.jsx    # Register/edit candidate form
+        │       ├── MarksEntry.jsx       # Paper scores entry + approval
+        │       └── Dashboard.jsx        # Stats, analytics chart, audit feed
+        │
+        └── pages/
+            ├── Home.jsx                 # Public landing page
+            ├── ResultsPage.jsx          # Public results lookup page
+            ├── LoginPage.jsx            # Admin JWT login
+            ├── AdminLayout.jsx          # Protected layout with sidebar
+            ├── DashboardPage.jsx        # Admin dashboard
+            ├── CandidatesPage.jsx       # Filterable candidate list
+            ├── RegisterCandidatePage.jsx
+            ├── EditCandidatePage.jsx
+            ├── MarksEntryPage.jsx
+            ├── AuditLogsPage.jsx
+            └── NotFound.jsx
 ```
 
 ---
 
-## Tech Stack
-
-### Backend
-| Technology | Version | Purpose |
-|---|---|---|
-| Python | 3.11+ | Runtime |
-| Django | 5.0+ | Web framework |
-| Django REST Framework | 3.15+ | REST API |
-| djangorestframework-simplejwt | 5.3+ | JWT authentication |
-| PostgreSQL | 15+ | Primary database |
-| Redis | 7+ | Caching & Celery broker |
-| Celery | 5.3+ | Async task queue |
-| django-cors-headers | 4.3+ | CORS management |
-| django-filter | 23+ | QuerySet filtering |
-| Pillow | 10+ | Image processing |
-| boto3 | 1.34+ | AWS S3 media storage |
-| psycopg2-binary | 2.9+ | PostgreSQL adapter |
-| python-decouple | 3.8+ | Environment config |
-| drf-spectacular | 0.27+ | OpenAPI/Swagger docs |
-
-### Frontend
-| Technology | Version | Purpose |
-|---|---|---|
-| React | 18+ | UI framework |
-| Vite | 5+ | Build tool |
-| React Router | v6 | Client-side routing |
-| Axios | 1.6+ | HTTP client |
-| Tailwind CSS | 3.4+ | Utility-first styling |
-| React Query | 5+ | Server state management |
-| React Hook Form | 7+ | Form handling |
-| Zod | 3+ | Schema validation |
-| html2canvas + jsPDF | latest | Result slip PDF export |
-
----
-
-## Core Features
-
-###  Public (No Login Required)
-- **Results Lookup**: Enter 11-digit index number + full name → instant results display
-- **Result Slip Download**: Print or download PDF result slip
-- **School Performance**: View school mean grades and rankings
-
-###  School Administration
-- Login 
-- Candidate registration with full KNEC data capture
-- Subject combination management and validation
-- Examination attendance recording
-- Access to candidate nominal rolls and timetables
-
-###  Examiner Portal
-- Secure marks entry per subject paper
-- Bulk marks upload via CSV/Excel
-- Real-time validation (range checks, duplicate detection)
-- Mark review and approval workflow
-
-###  KNEC Administration
-- Final candidate approval and index number assignment
-- Nationwide marks moderation
-- Irregularity and malpractice detection
-- Results locking and publication control
-- Full audit log viewer
-
-###  Analytics
-- School performance reports
-- County and national rankings
-- Subject performance trends
-- Grade distribution statistics
-
----
-
-## Installation & Setup
+## Getting Started
 
 ### Prerequisites
 
-- Python 3.11+
-- Node.js 20+
-- PostgreSQL 15+
-- Redis 7+
+- Python 3.10 or higher
+- Node.js 18 or higher
+- PostgreSQL 14 or higher
 
----
-
-### Backend (Django)
+### Backend Setup
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/your-org/kcse-system.git
-cd kcse-system/backend
-
-# 2. Create and activate virtual environment
+cd backend
 python -m venv venv
-source venv/bin/activate          # Linux/macOS
-# venv\Scripts\activate           # Windows
-
-# 3. Install dependencies
+source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# 4. Configure environment variables
-cp .env.example .env
-# Edit .env with your values (see Environment Variables section)
+cp .env.example .env              # fill in values
 
-# 5. Create PostgreSQL database
-psql -U postgres
-CREATE DATABASE kcse_db;
-CREATE USER kcse_user WITH PASSWORD 'strongpassword';
-GRANT ALL PRIVILEGES ON DATABASE kcse_db TO kcse_user;
-\q
-
-# 6. Run database migrations
 python manage.py migrate
-
-# 7. Load initial data (subjects, grading rules)
-python manage.py loaddata fixtures/subjects.json
-python manage.py loaddata fixtures/grading_rules.json
-
-# 8. Create superuser
 python manage.py createsuperuser
-
-# 9. Start development server
 python manage.py runserver
-
-# 10. (Optional) Start Celery worker for async tasks
-celery -A kcse_system worker --loglevel=info
 ```
 
-The API will be available at `http://localhost:8000/api/v1/`
+The API will be available at `http://localhost:8000/api/`.
 
-API Documentation (Swagger): `http://localhost:8000/api/docs/`
-
----
-
-### Frontend (React)
+### Frontend Setup
 
 ```bash
-# From project root
 cd frontend
-
-# 1. Install dependencies
+cp .env.example .env              # set VITE_API_BASE_URL if needed
 npm install
-
-# 2. Configure environment
-cp .env.example .env.local
-# Set VITE_API_BASE_URL=http://localhost:8000/api/v1
-
-# 3. Start development server
 npm run dev
 ```
 
-The frontend will be available at `http://localhost:5173/`
+The React app will be available at `http://localhost:5173/`.
+
+Vite is configured to proxy all `/api/*` requests to `http://localhost:8000`, so no CORS configuration is needed during development.
+
+### Production Build
+
+```bash
+cd frontend
+npm run build                     # outputs to dist/
+```
+
+Serve the `dist/` directory with Nginx or any static file server. Configure your web server to proxy `/api/*` to Django and serve `index.html` for all other routes (SPA fallback).
 
 ---
 
 ## Environment Variables
 
-### Backend `.env`
+### Backend (`backend/.env`)
 
-```ini
-# Django
-SECRET_KEY=your-secret-key-here
-DEBUG=True
-ALLOWED_HOSTS=localhost,127.0.0.1
-
-# Database
-DB_NAME=kcse_db
-DB_USER=kcse_user
-DB_PASSWORD=strongpassword
-DB_HOST=localhost
-DB_PORT=5432
-
-# Redis
-REDIS_URL=redis://localhost:6379/0
-
-# JWT
-JWT_ACCESS_TOKEN_LIFETIME_MINUTES=60
-JWT_REFRESH_TOKEN_LIFETIME_DAYS=7
-
-# AWS S3 (for passport photos in production)
-AWS_ACCESS_KEY_ID=your-key
-AWS_SECRET_ACCESS_KEY=your-secret
-AWS_STORAGE_BUCKET_NAME=kcse-media
-AWS_S3_REGION_NAME=af-south-1
-
-# Email (for staff notifications)
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_HOST_USER=noreply@kcse.go.ke
-EMAIL_HOST_PASSWORD=email-password
-
-# CORS
-CORS_ALLOWED_ORIGINS=http://localhost:5173
+```
+SECRET_KEY=your-django-secret-key
+DEBUG=False
+ALLOWED_HOSTS=yourdomain.com,localhost
+DATABASE_URL=postgresql://user:password@localhost:5432/kcse_db
 ```
 
-### Frontend `.env.local`
+### Frontend (`frontend/.env`)
 
-```ini
-VITE_API_BASE_URL=http://localhost:8000/api/v1
-VITE_APP_NAME=KCSE Results Portal
-VITE_KNEC_YEAR=2024
 ```
+VITE_API_BASE_URL=http://localhost:8000/api
+```
+
+In production, if the frontend and backend are served from the same domain, this can be left as `/api`.
 
 ---
 
 ## API Reference
 
-### Public Endpoints (No Authentication)
+### Public Endpoints
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/v1/results/lookup/` | Look up results by index number + full name |
-| `GET` | `/api/v1/results/slip/{index_number}/` | Download result slip PDF |
-| `GET` | `/api/v1/schools/performance/` | School mean grade rankings |
+No authentication required.
 
-### Results Lookup Request
+#### POST /api/results/lookup/
 
+Look up a candidate's results by index number and full name.
+
+Request body:
 ```json
-POST /api/v1/results/lookup/
 {
-  "index_number": "10234001001",
-  "full_name": "GADAFI IMRAN AKIL"
+  "index_number": "12345678901001",
+  "full_name": "JANE WANJIRU KAMAU",
+  "examination_year": 2023
 }
 ```
 
-### Results Lookup Response
+The `examination_year` field is optional. If omitted, the most recently released year is used.
 
+Name matching is fuzzy — at least two tokens from the provided name must match the registered name. This accommodates common name ordering variations.
+
+Response (success):
 ```json
 {
-  "candidate": {
-    "index_number": "10234001001",
-    "full_name": "GADAFI IMRAN AKIL",
-    "school_name": "Moi High School Nairobi",
-    "year": 2024,
-    "gender": "M"
-  },
-  "results": {
-    "mean_grade": "B+",
-    "mean_points": 10.3,
-    "total_subjects": 8,
-    "subjects": [
-      {
-        "subject_name": "English",
-        "subject_code": "101",
-        "marks": 72,
-        "grade": "B+",
-        "points": 10
-      },
-      {
-        "subject_name": "Mathematics",
-        "subject_code": "121",
-        "marks": 81,
-        "grade": "A-",
-        "points": 11
-      }
-    ]
+  "success": true,
+  "result": {
+    "index_number": "12345678901001",
+    "full_name": "JANE WANJIRU KAMAU",
+    "gender_display": "Female",
+    "school_name": "Alliance Girls High School",
+    "school_center_code": "10000000001",
+    "county": "Kiambu",
+    "sub_county": "Limuru",
+    "examination_year_value": 2023,
+    "subject_results": [ ... ],
+    "overall_result": { ... }
   }
 }
 ```
 
-### Authenticated Endpoints (Staff Only)
+This endpoint is rate-limited to 20 requests per hour per IP address.
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/v1/auth/login/` | Staff login |
-| `POST` | `/api/v1/auth/refresh/` | Refresh JWT token |
-| `GET/POST` | `/api/v1/candidates/` | List / register candidates |
-| `GET/PUT` | `/api/v1/candidates/{id}/` | Retrieve / update candidate |
-| `POST` | `/api/v1/candidates/{id}/submit/` | Submit for KNEC approval |
-| `GET/POST` | `/api/v1/marks/` | List / enter marks |
-| `POST` | `/api/v1/marks/bulk-upload/` | Bulk marks upload (CSV) |
-| `POST` | `/api/v1/marks/{id}/approve/` | Chief examiner approval |
-| `POST` | `/api/v1/results/process/` | Trigger results computation |
-| `POST` | `/api/v1/results/publish/` | Publish results (KNEC admin) |
-| `GET` | `/api/v1/analytics/school/{id}/` | School performance report |
-| `GET` | `/api/v1/analytics/national/` | National statistics |
-| `GET` | `/api/v1/audit-logs/` | System audit trail |
+#### GET /api/reference/years/
+
+Returns all examination years with released results. Response is cached for one hour.
+
+#### GET /api/reference/grading-scale/
+
+Returns the full KCSE grading scale. Response is cached for one hour.
+
+---
+
+### Admin Endpoints
+
+All endpoints below require a valid JWT access token in the `Authorization: Bearer <token>` header.
+
+#### Authentication
+
+```
+POST /api/token/           # obtain access + refresh tokens
+POST /api/token/refresh/   # exchange refresh token for new access token
+```
+
+#### Candidate Management
+
+```
+GET    /api/admin/candidates/                    # list with ?name=&school=&year= filters
+POST   /api/admin/candidates/register/           # register new candidate
+GET    /api/admin/candidates/<index_number>/     # retrieve candidate
+PATCH  /api/admin/candidates/<index_number>/     # update candidate
+```
+
+#### Marks
+
+```
+POST /api/admin/marks/enter/              # enter paper scores
+POST /api/admin/marks/<uuid>/approve/     # approve (lock) a SubjectResult
+```
+
+#### Analytics
+
+```
+GET /api/admin/analytics/school/<center_code>/?year=2023
+```
+
+Returns total candidates, mean points, mean score, and grade distribution for a school.
+
+#### Audit Logs
+
+```
+GET /api/admin/audit-logs/?action=RESULT_VIEW&index_number=12345678901001
+```
+
+Returns up to 500 most recent matching entries.
+
+---
+
+## Frontend Architecture
+
+### Routing
+
+Routes are split into two trees:
+
+- **Public tree** — wrapped with `Navbar` and `Footer`, no authentication check
+- **Admin tree** — wrapped with `AdminLayout` which redirects unauthenticated users to `/admin/login`
+
+```
+/                          Home
+/results                   ResultsPage
+/admin/login               LoginPage
+/admin/dashboard           DashboardPage        (protected)
+/admin/candidates          CandidatesPage       (protected)
+/admin/candidates/register RegisterCandidatePage (protected)
+/admin/candidates/:id      EditCandidatePage    (protected)
+/admin/marks/enter         MarksEntryPage       (protected)
+/admin/audit-logs          AuditLogsPage        (protected)
+*                          NotFound
+```
+
+### State Management
+
+There is no global state library. State is managed through:
+
+- `AuthContext` — authentication state, available application-wide via `useAuth()`
+- `useResults` — result lookup state (result, loading, error, available years)
+- Local `useState` — form state within individual components
+
+### API Layer
+
+All HTTP calls go through `src/utils/api.js`, which exports a configured Axios instance plus named functions for every endpoint. The instance automatically:
+
+- Attaches the JWT access token from `localStorage` to every request
+- Redirects to `/admin/login` on any 401 response
+
+### Design System
+
+All design tokens are CSS custom properties defined in `general.css`. Components reference these variables directly — no CSS-in-JS library is used.
+
+Key tokens:
+
+```css
+--clr-primary: #0a4a2f          /* deep government green */
+--clr-accent:  #c8a84b          /* gold accent */
+--clr-bg:      #f7f5f0          /* warm ivory background */
+--font-display: 'Playfair Display', Georgia, serif
+--font-body:    'DM Sans', system-ui, sans-serif
+--font-mono:    'DM Mono', 'Courier New', monospace
+```
+
+---
+
+## Backend Architecture
+
+### Models
+
+| Model              | Purpose                                           |
+|-------------------|---------------------------------------------------|
+| `County`           | Kenyan county reference data                     |
+| `SubCounty`        | Sub-county reference, FK to County               |
+| `Subject`          | Examination subject catalogue                    |
+| `GradingScale`     | Grade letters, points, and score ranges          |
+| `School`           | Examination centre with 11-digit centre code     |
+| `ExaminationYear`  | Academic year with lifecycle status              |
+| `Candidate`        | Student registration record                      |
+| `CandidateSubject` | Through model linking candidates to subjects     |
+| `SubjectResult`    | Individual paper scores and computed grade       |
+| `OverallResult`    | Aggregated result — best 7 subjects              |
+| `AuditLog`         | Immutable log of all significant system actions  |
+| `ResultQuery`      | Record of every public result lookup             |
+
+### Views
+
+| View                       | Type            | Permission     |
+|---------------------------|-----------------|----------------|
+| `ResultLookupView`         | APIView         | AllowAny       |
+| `active_examination_years` | function view   | AllowAny       |
+| `grading_scale`            | function view   | AllowAny       |
+| `CandidateRegistrationView`| CreateAPIView   | IsAdminUser    |
+| `CandidateDetailView`      | RetrieveUpdateAPIView | IsAdminUser |
+| `CandidateListView`        | ListAPIView     | IsAdminUser    |
+| `SubjectResultEntryView`   | CreateAPIView   | IsAdminUser    |
+| `SubjectResultApproveView` | APIView         | IsAdminUser    |
+| `SchoolPerformanceView`    | APIView         | IsAdminUser    |
+| `AuditLogListView`         | ListAPIView     | IsAdminUser    |
+
+---
+
+## Authentication
+
+The system uses JSON Web Tokens via Django Simple JWT.
+
+- Access tokens are stored in `localStorage` under the key `access_token`
+- Refresh tokens are stored under `refresh_token`
+- User metadata (username, is_staff, is_superuser) is decoded from the JWT payload and stored in `localStorage` under `user`
+- The Axios interceptor attaches the access token to every outbound request and clears storage on 401
+
+For production deployments, consider storing tokens in `httpOnly` cookies instead of `localStorage` to mitigate XSS risk.
 
 ---
 
 ## Data Models
 
-### Core Models (examinations app)
+### Candidate index number format
 
-**ExaminationYear** — Controls which year's results are active and published
+```
+[11-digit centre code][3-digit student number]
+Total: 14 digits
 
-**ExaminationCenter** — Schools registered as KNEC exam centers with their center codes
+Example: 10000000001001
+         ^^^^^^^^^^^ ^^^
+         centre code  student number
+```
 
-**Candidate** — Full student registration data: name, index number, KCPE index, subjects, passport photo, registration status
+The centre code matches the `School.center_code` field exactly.
 
-**Subject** — All KCSE examinable subjects with codes, paper structure, and compulsory/optional flags
+### Examination year lifecycle
 
-**CandidateSubject** — Many-to-many link between candidates and their selected subjects
+```
+REGISTRATION_OPEN
+      |
+REGISTRATION_CLOSED
+      |
+EXAMINATION_ONGOING
+      |
+MARKING_ONGOING
+      |
+RESULTS_RELEASED     <-- public lookup becomes available
+      |
+ARCHIVED
+```
 
-**ExaminationScript** — Barcode-tracked physical scripts moving from exam room → marking center → examined
+Results are only accessible via the public API when the year's status is `RESULTS_RELEASED`.
 
-**MarksEntry** — Individual examiner mark entries per candidate per subject paper, with validation flags
+### SubjectResult status flow
 
-**SubjectResult** — Computed final marks, grade, and points per subject per candidate after moderation
+```
+PENDING -> ENTERED -> VALIDATED -> MODERATED -> APPROVED
+                                              -> WITHHELD
+                                              -> CANCELLED
+                       ABSENT (set directly)
+```
 
-**CandidateResult** — Aggregate result: mean grade, mean points, division, overall ranking
-
-**ResultPublication** — Controls when results go live: published flag, publish date, authorized by
-
-**AuditLog** — Immutable record of every action: user, timestamp, action type, affected object, IP address
+Only results in ENTERED, VALIDATED, or MODERATED status can be approved. Once APPROVED, marks are locked.
 
 ---
 
 ## Grading System
 
-KCSE grades are assigned per subject based on marks out of 100:
+KCSE uses a 12-point grading scale. The overall grade is computed from the best 7 subjects, with English and Kiswahili counted as compulsory.
 
-| Grade | Points | Marks Range |
-|---|---|---|
-| A | 12 | 75 – 100 |
-| A- | 11 | 70 – 74 |
-| B+ | 10 | 65 – 69 |
-| B | 9 | 60 – 64 |
-| B- | 8 | 55 – 59 |
-| C+ | 7 | 50 – 54 |
-| C | 6 | 45 – 49 |
-| C- | 5 | 40 – 44 |
-| D+ | 4 | 35 – 39 |
-| D | 3 | 30 – 34 |
-| D- | 2 | 25 – 29 |
-| E | 1 | 00 – 24 |
-
-**Mean Grade** is calculated by averaging points across the best 7 subjects (or as KNEC specifies per year). The mean points determine the overall letter grade using the same scale.
-
-The grading engine lives in `apps/examinations/grading.py` and is invoked by the `process_results` management command / Celery task after marks are locked and moderated.
+| Grade | Points | Score Range  |
+|-------|--------|--------------|
+| A     | 12     | 80 – 100     |
+| A-    | 11     | 75 – 79.99   |
+| B+    | 10     | 70 – 74.99   |
+| B     | 9      | 65 – 69.99   |
+| B-    | 8      | 60 – 64.99   |
+| C+    | 7      | 55 – 59.99   |
+| C     | 6      | 50 – 54.99   |
+| C-    | 5      | 45 – 49.99   |
+| D+    | 4      | 40 – 44.99   |
+| D     | 3      | 35 – 39.99   |
+| D-    | 2      | 30 – 34.99   |
+| E     | 1      | 0 – 29.99    |
+| X     | 0      | Absent / Cancelled |
 
 ---
 
-## Security & Audit
+## Security Considerations
 
-- All staff actions are logged to `AuditLog` (user, IP, timestamp, object, action)
-- Results are read-only once published — no edits without KNEC admin override + audit entry
-- Marks entry is locked per subject once approved by chief examiner
-- JWT tokens expire after 60 minutes; refresh tokens after 7 days
-- Rate limiting applied on the public `/results/lookup/` endpoint (20 requests/minute per IP)
-- Candidate passport photos stored in private S3 bucket, served via signed URLs
-- SQL injection and XSS protection via Django ORM and DRF serializers
+### Rate limiting
 
----
+The public result lookup endpoint is throttled to 20 requests per hour per anonymous IP. Every query — successful or not — is recorded in the `ResultQuery` table with the IP address, user agent, and whether the candidate was found.
 
-## Running Tests
+### Name verification
 
-```bash
-# Backend
-cd backend
-python manage.py test apps.examinations --verbosity=2
+The lookup requires the candidate's full name in addition to the index number. The system checks that at least two name tokens match the registered name, preventing unauthorized result access even when an index number is known.
 
-# With coverage
-pip install coverage
-coverage run manage.py test
-coverage report
-coverage html  # Opens htmlcov/index.html
+### Audit logging
 
-# Frontend
-cd frontend
-npm run test
-npm run test:coverage
-```
+All significant actions are written to `AuditLog` with the acting user, IP address, timestamp, and a description. Logs are append-only and ordered by timestamp descending. The admin UI exposes the last 500 entries with filtering by action type and index number.
+
+### Result withholding
+
+Results with status `WITHHELD` or `CANCELLED` in `OverallResult` are blocked from the public API. The candidate receives a message directing them to contact KNEC.
 
 ---
 
-## Deployment
+## Development Notes
 
-### Production Checklist
+### Adding a new examination year
 
-- [ ] Set `DEBUG=False`
-- [ ] Configure `ALLOWED_HOSTS` with your domain
-- [ ] Use `gunicorn` + `nginx` for Django
-- [ ] Configure PostgreSQL with connection pooling (pgBouncer)
-- [ ] Set up Redis Sentinel or Redis Cluster for HA
-- [ ] Configure S3 for media storage
-- [ ] Enable HTTPS / SSL certificate (Let's Encrypt)
-- [ ] Set up Celery with systemd or supervisor
-- [ ] Configure Django's `SECURE_*` settings
-- [ ] Run `python manage.py collectstatic`
+1. Create an `ExaminationYear` record via Django admin with status `REGISTRATION_OPEN`
+2. Progress the status through the lifecycle as the examination proceeds
+3. Set status to `RESULTS_RELEASED` to make results available on the public portal
 
-### Docker (Recommended)
+### Grade computation
 
-```bash
-# Build and start all services
-docker compose up --build
+Grade computation (assigning a `GradingScale` FK based on final score) and overall result aggregation are not handled automatically by the API. These should be implemented as Django management commands or Celery tasks that run after marks approval. The models are fully structured to receive these computed values.
 
-# Run migrations inside container
-docker compose exec backend python manage.py migrate
+### Caching
 
-# Create superuser
-docker compose exec backend python manage.py createsuperuser
-```
+The `/api/reference/years/` and `/api/reference/grading-scale/` endpoints are cached for one hour using Django's default cache backend. Configure `CACHES` in settings to use Redis or Memcached in production.
 
-`docker-compose.yml` includes: `db` (PostgreSQL), `redis`, `backend` (Django + Gunicorn), `celery`, `frontend` (React + Nginx), `nginx` (reverse proxy).
+### Pagination
 
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Commit your changes: `git commit -m "feat: add my feature"`
-4. Push to the branch: `git push origin feature/my-feature`
-5. Open a Pull Request
-
-Please follow [Conventional Commits](https://www.conventionalcommits.org/) and ensure all tests pass before submitting.
-
----
-
-## License
-
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
-
----
-
-> Built for the Kenya National Examinations Council (KNEC) examination management ecosystem.
-> For official KNEC information visit [www.knec.ac.ke](https://www.knec.ac.ke)
+The `CandidateListView` does not currently enforce pagination limits in the provided code. Add `pagination_class` and `page_size` settings in production to prevent large response payloads.
