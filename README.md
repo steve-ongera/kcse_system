@@ -90,7 +90,7 @@ kcse_system/
 │   │   ├── wsgi.py
 │   │   └── asgi.py
 │   │
-│   └── apps/
+│   └── core/
 │       ├── examinations/             #  CORE APPLICATION
 │       │   ├── __init__.py
 │       │   ├── admin.py
@@ -133,13 +133,14 @@ kcse_system/
     └── src/
         ├── main.jsx
         ├── App.jsx
-        ├── api/
-        │   ├── axios.js
-        │   └── endpoints.js
+        ├── utils/
+        │   ├── api.js
+        │   
         ├── components/
         │   ├── common/
         │   │   ├── Navbar.jsx
         │   │   ├── Footer.jsx
+        |   |   |__Sider.jsx( For superusers not nomal page)
         │   │   ├── LoadingSpinner.jsx
         │   │   └── ErrorBoundary.jsx
         │   ├── results/
@@ -154,16 +155,16 @@ kcse_system/
         ├── pages/
         │   ├── Home.jsx
         │   ├── ResultsPage.jsx         # Public results lookup page
-        │   ├── AdminDashboard.jsx
+        │   ├── Admin pages (login.jsx etc )
         │   └── NotFound.jsx
         ├── hooks/
         │   ├── useResults.js
         │   └── useAuth.js
         ├── context/
         │   └── AuthContext.jsx
-        └── utils/
-            ├── formatters.js
-            └── validators.js
+        └── styles/
+            ├── general.css
+            └── adminpages.css
 ```
 
 ---
@@ -211,6 +212,7 @@ kcse_system/
 - **School Performance**: View school mean grades and rankings
 
 ###  School Administration
+- Login 
 - Candidate registration with full KNEC data capture
 - Subject combination management and validation
 - Examination attendance recording
