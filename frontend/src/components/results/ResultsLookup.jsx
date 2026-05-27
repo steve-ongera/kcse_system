@@ -1,3 +1,4 @@
+// components/results/ResultsLookup.jsx
 import { useState, useEffect } from 'react';
 import { useResults } from '../../hooks/useResults';
 import ResultSlip from './ResultSlip';

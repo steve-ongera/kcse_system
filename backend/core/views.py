@@ -72,7 +72,6 @@ def names_match(registered: str, provided: str, threshold: int = 2) -> bool:
 class ResultQueryThrottle(AnonRateThrottle):
     rate = '20/hour'
 
-
 class ResultLookupView(APIView):
     """
     PUBLIC endpoint – no authentication required.
@@ -83,6 +82,23 @@ class ResultLookupView(APIView):
     """
     permission_classes = [permissions.AllowAny]
     throttle_classes = [ResultQueryThrottle]
+
+    def get(self, request):
+        """Handle GET requests - returns API documentation"""
+        return Response({
+            'message': 'This endpoint accepts POST requests only',
+            'instructions': {
+                'method': 'POST',
+                'content_type': 'application/json',
+                'required_fields': ['index_number', 'full_name'],
+                'optional_fields': ['examination_year'],
+                'example_request': {
+                    'index_number': '12345678901001',
+                    'full_name': 'JOHN DOE',
+                    'examination_year': 2024
+                }
+            }
+        }, status=status.HTTP_200_OK)
 
     def post(self, request):
         serializer = ResultQueryInputSerializer(data=request.data)
@@ -214,7 +230,6 @@ class ResultLookupView(APIView):
 
         result_data = CandidateResultSerializer(candidate).data
         return Response({'success': True, 'result': result_data}, status=status.HTTP_200_OK)
-
 
 # ─────────────────────────────────────────────
 # PUBLIC: REFERENCE DATA
