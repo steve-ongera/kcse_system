@@ -1,4 +1,5 @@
 """
+core/urls.py
 KCSE Management System - URL Configuration
 """
 

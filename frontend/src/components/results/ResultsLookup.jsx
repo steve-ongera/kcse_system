@@ -10,6 +10,13 @@ export default function ResultsLookup() {
 
   useEffect(() => { loadYears(); }, [loadYears]);
 
+  // Normalise whatever useResults gives us into a plain array
+  const safeYears = Array.isArray(years)
+    ? years
+    : Array.isArray(years?.results)
+      ? years.results
+      : [];
+
   const validate = () => {
     const errs = {};
     const idx = form.index_number.replace(/\s/g, '');
@@ -107,7 +114,8 @@ export default function ResultsLookup() {
           {/* Examination year */}
           <div className="form-group">
             <label className="form-label" htmlFor="examination_year">
-              Examination Year <span style={{ color: 'var(--clr-text-muted)', fontWeight: 400 }}>(optional)</span>
+              Examination Year{' '}
+              <span style={{ color: 'var(--clr-text-muted)', fontWeight: 400 }}>(optional)</span>
             </label>
             <select
               id="examination_year"
@@ -117,7 +125,7 @@ export default function ResultsLookup() {
               onChange={handleChange}
             >
               <option value="">Latest available year</option>
-              {years.map(y => (
+              {safeYears.map(y => (
                 <option key={y.id} value={y.year}>{y.year}</option>
               ))}
             </select>

@@ -124,11 +124,16 @@ USE_TZ = True
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ── SECURITY (production) ─────────────────────────────────────────────────
+# settings.py  — replace the existing security block at the bottom
+
 if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_SSL_REDIRECT = True          # only redirect in production
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+else:
+    SECURE_SSL_REDIRECT = False         # never redirect in dev
