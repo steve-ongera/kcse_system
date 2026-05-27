@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',  # Add JWT support
     'corsheaders',
+    'django_extensions',
     'core',  # Your app
 ]
 
